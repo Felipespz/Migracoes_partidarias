@@ -3,20 +3,20 @@ library(officer)     # Para limpeza de texto na junção das variáveis
 library(stringi)     # Para limpeza de texto na junção das variáveis
 library(lmtest)      # Para aplicação do General Linear Model "glm()"
 
-#Puxando e transformando os dados
+#Puxando os dados
+
+# O banco de dados utilizado como base foi coletado por Sainz, N. & Codato, A. (2025), considerando os
+# deputados titulares eleitos entre os anos de 1988 e 2022 a partir de dados do Tribunal Superior Eleitoral.
+
+# O projeto ocorre no âmbito do INCT Redem (Representação e Legitimidade Democrática).
+
   banco_de_migrações_cap <- read_xlsx("C:/Users/felip/Downloads/BD_Sainz&Codato_ClassePolíticadoBrasil_INCT_ReDem_2025.xlsx")
-  
+
+# São recategorizados os dados de Ideologia e Tamanho de partido, este último considerando o aspecto temporal 
+# da variação de bancadas eleitas para a Câmara dos Deputados
+
   banco_de_migrações_cap <- banco_de_migrações_cap |>
     mutate(
-      idLegislatura = case_when(
-        Ano_Eleição == 1998 ~ "51",
-        Ano_Eleição == 2002 ~ "52",
-        Ano_Eleição == 2006 ~ "53",
-        Ano_Eleição == 2010 ~ "54",
-        Ano_Eleição == 2014 ~ "55",
-        Ano_Eleição == 2018 ~ "56",
-        Ano_Eleição == 2022 ~ "57"
-      ),
       Ideologia = case_when(
         Sigla_Partido == "PT DO B" ~ "Direita",
         Sigla_Partido == "PTdoB" ~ "Direita",
@@ -210,13 +210,17 @@ library(lmtest)      # Para aplicação do General Linear Model "glm()"
         Sigla_Partido == "AVANTE" & idLegislatura == 56 ~ "Pequeno", # era PTdoB
         Sigla_Partido == "MOBILIZA" & idLegislatura >= 57 ~ "Nanico", # era PMN
         
-        # Padrão para partidos não listados ou legislaturas futuras
+        # Padrão para partidos não listados ou legislaturas futuras, servindo como debug
         TRUE ~ "Indefinido"
       )
     )
 
+# Os nomes dos deputados são transformados para organizar o banco e possibilitar a verificação de quais foram reeleitos
+
 banco_de_migrações_cap$Nome_Deputado <-
 stri_trans_general(banco_de_migrações_cap$Nome_Deputado, "LATIN-ASCII")
+
+# Isso é necessário para, na criação dos sankey's, verificar quem efetivamente migrou, e não meramente as variações de bancada
 
   banco_final_cap <- banco_final_cap |>
     arrange(idLegislatura, Nome_Deputado) |>  # Ordenar por legislatura para ordem cronológica
@@ -228,32 +232,33 @@ stri_trans_general(banco_de_migrações_cap$Nome_Deputado, "LATIN-ASCII")
     ungroup()
 
 #Sankey plots
-  # 1. Filtrar e preparar os dados
+  # Filtrar e preparar os dados
   sankey <- banco_final_cap |>
     filter(Reeleito == "Sim") |>
     arrange(Nome_Deputado, Ano_Eleição)
-    
+
+# Foi utilizado a biblioteca "plotly" em razão do número de categorias, que gerava um bug de coloração com o uso da "network3D"
+
+# Execução da função criada e exibição do gráfico
     print(gerar_sankey_ideologia_plotly(sankey))
-    
+# Execução da função criada e exibição do gráfico
     print(gerar_sankey_tamanho_plotly(sankey))
 
-  #Recategorização dos dados
+# Recategorização dos dados
     # Primeiro, ordenar por Nome_Deputado e idLegislatura para garantir ordem cronológica
     banco_de_migrações_cap <- banco_de_migrações_cap %>%
       arrange(Nome_Deputado, idLegislatura)
     
-    banco_de_migrações_cap <- banco_de_migrações
-    banco_de_migrações_cap$Nome_Deputado <- stri_trans_general(banco_de_migrações_cap$Nome_Deputado, "LATIN-ASCII")
-    banco_de_migrações_cap$Nome_Deputado <- str_to_title(banco_de_migrações_cap$Nome_Deputado)
-    banco_de_migrações_cap <- banco_de_migrações_cap |> 
-      arrange(Nome_Deputado, idLegislatura)
-    
     # Aplicar a lógica de migração
     banco_de_migrações_cap <- banco_de_migrações_cap %>%
-      arrange(Nome_Deputado, Ano_Eleição) %>%  # USAR ANO_ELEIÇÃO, não idLegislatura
+      arrange(Nome_Deputado, Ano_Eleição) %>%  # Usar Ano_Eleição ou idLegislatura
       group_by(Nome_Deputado) %>%
       mutate(
-        primeira_aparicao = row_number() == 1,
+        primeira_aparicao = row_number() == 1, # Verifica se o nome do parlamentar aparece pela primeira vez no banco
+
+        # Aqui verifica-se: se não é a primeira aparição do deputado ENTÃO qual o partido anterior lag()
+        # se o partido anterior é igual, então o comando encerra e é atribuido valor FALSE para 'mudança_legítima', 
+        # se for diferente verifica se decorre de uma mudança de nome, fusão, aglutinação ou mesmo federação.
         
         mudanca_legitima = case_when(
           primeira_aparicao ~ FALSE,
