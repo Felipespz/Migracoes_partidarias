@@ -1,5 +1,4 @@
-library(tidyverse)
-library(patchwork)
+library(tidyverse)   # Pacote geral para pipes (|>) e demais comandos básicos de limpeza (tidy)
 library(officer)     # Para limpeza de texto na junção das variáveis
 library(stringi)     # Para limpeza de texto na junção das variáveis
 library(lmtest)      # Para aplicação do General Linear Model "glm()"
