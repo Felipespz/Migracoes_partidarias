@@ -1,3 +1,6 @@
+library(tidyverse)
+library(plotly)     # Para os sankey plots
+
 gerar_sankey_ideologia_plotly <- function(df) {
       
       # Criar pares ideológicos consecutivos por deputado
