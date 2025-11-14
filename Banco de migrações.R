@@ -1,5 +1,3 @@
-library(readxl)
-library(writexl)
 library(tidyverse)
 library(patchwork)
 library(officer)     # Para limpeza de texto na junção das variáveis
