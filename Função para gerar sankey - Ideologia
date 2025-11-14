@@ -1,5 +1,7 @@
 library(tidyverse)
 library(plotly)     # Para os sankey plots
+library(htmlwidgets) # Para edições nos sankey plots
+library(htmltools)   # Para edições nos sankey plots
 
 gerar_sankey_ideologia_plotly <- function(df) {
       
