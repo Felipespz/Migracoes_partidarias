@@ -11,7 +11,7 @@ library(lmtest)     # Para teste de razão de verossimilhança
 library(plotly)     # Para os sankey plots
 
 #Puxando e transformando os dados
-  banco_de_migrações <- read_xlsx("C:/Users/felip/Downloads/BD_Sainz&Codato_ClassePolíticadoBrasil_INCT_ReDem_2025.xlsx")
+  banco_de_migrações_cap <- read_xlsx("C:/Users/felip/Downloads/BD_Sainz&Codato_ClassePolíticadoBrasil_INCT_ReDem_2025.xlsx")
   
   banco_de_migrações_cap <- banco_de_migrações_cap |>
     mutate(
@@ -221,6 +221,7 @@ library(plotly)     # Para os sankey plots
         TRUE ~ "Indefinido"
       )
     )
+
   banco_final_cap <- banco_final_cap |>
     arrange(idLegislatura, Nome_Deputado) |>  # Ordenar por legislatura para ordem cronológica
     group_by(Nome_Deputado) |>
@@ -231,7 +232,6 @@ library(plotly)     # Para os sankey plots
     ungroup()
 
 #Sankey plots
-{
   # 1. Filtrar e preparar os dados
   sankey <- banco_final_cap |>
     filter(Reeleito == "Sim") |>
@@ -239,133 +239,9 @@ library(plotly)     # Para os sankey plots
     
     print(gerar_sankey_ideologia_plotly(sankey))
     
-    # Função para Sankey de Tamanho com Plotly - Versão Melhorada
-    gerar_sankey_tamanho_plotly <- function(df) {
-      
-      # Criar pares de tamanho consecutivos por deputado
-      df_pairs <- df |>
-        group_by(Nome_Deputado) |>
-        mutate(origem = lag(Tamanho),
-               destino = Tamanho,
-               ano_origem = lag(Ano_Eleição),
-               ano_destino = Ano_Eleição) |>
-        filter(!is.na(origem), ano_destino - ano_origem == 4) |>
-        ungroup() |>
-        mutate(source = paste0(origem, " em ", ano_origem),
-               target = paste0(destino, " em ", ano_destino)) |>
-        count(source, target, name = "value")
-      
-      # Criar lista de nós únicos
-      nodes <- data.frame(name = unique(c(df_pairs$source, df_pairs$target)))
-      
-      # Extrair tamanho e ano para ordenação
-      nodes$tamanho <- gsub(" em .*", "", nodes$name)
-      nodes$ano <- as.numeric(gsub(".* em ", "", nodes$name))
-      
-      # Definir posição X baseada no ano (0 a 1) - mais próximos
-      anos_unicos <- sort(unique(nodes$ano))
-      # Reduzir distância entre anos pela metade
-      nodes$x <- 0.1 + (match(nodes$ano, anos_unicos) - 1) * 0.8 / (length(anos_unicos) - 1) * 0.5
-      
-      # Definir posição Y baseada no tamanho dentro de cada ano
-      nodes <- nodes |>
-        group_by(ano) |>
-        mutate(y = case_when(
-          tamanho == "Grande" ~ 0.8,
-          tamanho == "Médio" ~ 0.6,
-          tamanho == "Pequeno" ~ 0.4,
-          tamanho == "Nanico" ~ 0.2,
-          TRUE ~ 0.5
-        )) |>
-        ungroup() |>
-        arrange(ano, factor(tamanho, levels = c("Grande", "Médio", "Pequeno", "Nanico")))
-      
-      # Definir cores
-      cores_tamanho <- c(
-        "Grande" = "#e2030a",
-        "Médio" = "#0a6b00", 
-        "Pequeno" = "#0073e6",
-        "Nanico" = "#ff6d0f"
-      )
-      
-      nodes$color <- cores_tamanho[nodes$tamanho]
-      
-      # Mapear índices
-      df_pairs$source_id <- match(df_pairs$source, nodes$name) - 1
-      df_pairs$target_id <- match(df_pairs$target, nodes$name) - 1
-      
-      # Colorir conexões baseado no nó de origem
-      df_pairs$link_color <- paste0(substr(nodes$color[df_pairs$source_id + 1], 1, 7), "80")  # Add transparency
-      
-      # Criar sankey com plotly
-      fig <- plot_ly(
-        type = "sankey",
-        orientation = "h",
-        node = list(
-          #label = nodes$name,
-          color = nodes$color,
-          x = nodes$x,
-          y = nodes$y,
-          pad = 5,  # Reduzido para nós mais próximos
-          thickness = 40,
-          line = list(color = "black", width = 0.5)
-        ),
-        link = list(
-          source = df_pairs$source_id,
-          target = df_pairs$target_id,
-          value = df_pairs$value,
-          color = df_pairs$link_color
-        )
-      )
-      
-      # Layout com legenda customizada
-      fig <- fig |>
-        layout(
-          title = "Migração Por Tamanho de Partido (1998–2022)",
-          font = list(family = "Garamond", size = 25),
-          margin = list(l = 50, r = 150, t = 80, b = 50),
-          annotations = list(
-            # Título da legenda
-            list(x = 1.05, y = 0.95, text = "<b>Legenda:</b>", 
-                 showarrow = FALSE, xref = "paper", yref = "paper",
-                 font = list(family = "Garamond", size = 25)),
-            
-            # Itens da legenda
-            list(x = 1.05, y = 0.85, text = "■ Grande (50+ deputados)", 
-                 showarrow = FALSE, xref = "paper", yref = "paper",
-                 font = list(family = "Garamond", size = 18, color = "#e2030a")),
-            
-            list(x = 1.05, y = 0.78, text = "■ Médio (21-49 deputados)", 
-                 showarrow = FALSE, xref = "paper", yref = "paper",
-                 font = list(family = "Garamond", size = 18, color = "#0a6b00")),
-            
-            list(x = 1.05, y = 0.71, text = "■ Pequeno (5-20 deputados)", 
-                 showarrow = FALSE, xref = "paper", yref = "paper",
-                 font = list(family = "Garamond", size = 18, color = "#0073e6")),
-            
-            list(x = 1.05, y = 0.64, text = "■ Nanico (até 4 deputados)", 
-                 showarrow = FALSE, xref = "paper", yref = "paper",
-                 font = list(family = "Garamond", size = 18, color = "#ff6d0f"))
-          )
-        )
-      
-      return(fig)
-    }
-    
     print(gerar_sankey_tamanho_plotly(sankey))
 
-banco_migrações <- readxl::read_xlsx("C:/Users/controladoria/Downloads/banco_final_migrações.xlsx")
-
-banco_migrações$nome <- toupper(banco_migrações$nome)
-banco_migrações$nomeEleitoral <- toupper(banco_migrações$nomeEleitoral)
-
-situações_migrantes <- data.frame(table(banco_migrações$descricaoStatus))
-write_xlsx(list("Migrações" = banco_migrações, "Status categorias" = situações_migrantes), "banco bruto de migrações.xlsx")
-
-#Tratamento do banco final do livro
-{
   #Recategorização dos dados
-  {
     # Primeiro, ordenar por Nome_Deputado e idLegislatura para garantir ordem cronológica
     banco_de_migrações_cap <- banco_de_migrações_cap %>%
       arrange(Nome_Deputado, idLegislatura)
