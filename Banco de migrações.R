@@ -2,9 +2,6 @@ library(readxl)
 library(writexl)
 library(tidyverse)
 library(patchwork)
-library(ggraph)
-library(htmlwidgets) # Para edições nos sankey plots
-library(htmltools)   # Para edições nos sankey plots
 library(officer)     # Para limpeza de texto na junção das variáveis
 library(stringi)     # Para limpeza de texto na junção das variáveis
 library(lmtest)     # Para teste de razão de verossimilhança
