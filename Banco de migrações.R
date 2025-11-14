@@ -8,7 +8,6 @@ library(htmltools)   # Para edições nos sankey plots
 library(officer)     # Para limpeza de texto na junção das variáveis
 library(stringi)     # Para limpeza de texto na junção das variáveis
 library(lmtest)     # Para teste de razão de verossimilhança
-library(plotly)     # Para os sankey plots
 
 #Puxando e transformando os dados
   banco_de_migrações_cap <- read_xlsx("C:/Users/felip/Downloads/BD_Sainz&Codato_ClassePolíticadoBrasil_INCT_ReDem_2025.xlsx")
