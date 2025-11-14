@@ -1,0 +1,185 @@
+gerar_sankey_ideologia_colorido <- function(df) {
+      
+      # Criar pares ideológicos consecutivos por deputado
+      df_pairs <- df |>
+        group_by(Nome_Deputado) |>
+        mutate(origem = lag(Ideologia),
+               destino = Ideologia,
+               ano_origem = lag(Ano_Eleição),
+               ano_destino = Ano_Eleição) |>
+        filter(!is.na(origem), ano_destino - ano_origem == 4) |>
+        ungroup() |>
+        mutate(source = paste0(origem, " em ", ano_origem),
+               target = paste0(destino, " em ", ano_destino)) |>
+        count(source, target, name = "value")
+      
+      # Criar lista de nós únicos
+      nodes <- data.frame(name = unique(c(df_pairs$source, df_pairs$target)))
+      
+      # Extrair ideologia de cada node
+      nodes$ideologia <- gsub("_.*", "", nodes$name)
+      
+      # Atribuir cor com base na ideologia
+      nodes$color <- recode(nodes$ideologia,
+                            Esquerda = "#e2030a",
+                            Centro   = "#0a6b00",
+                            Direita  = "#0073e6")
+      
+      # Mapear índices para source/target
+      df_pairs$source_id <- match(df_pairs$source, nodes$name) - 1
+      df_pairs$target_id <- match(df_pairs$target, nodes$name) - 1
+      
+      df_pairs$group <- nodes$ideologia[df_pairs$source_id + 1]
+      
+      # Criar sankey com estilo
+      sankey <- sankeyNetwork(
+        Links = df_pairs,
+        Nodes = nodes,
+        Source = "source_id", Target = "target_id",
+        Value = "value", NodeID = "name",
+        NodeGroup = "ideologia",
+        LinkGroup = "group",
+        fontSize = 0, nodeWidth = 30,
+        height = 512, width = 866,
+        colourScale = JS(
+          'd3.scaleOrdinal()
+       .domain(["Esquerda", "Centro", "Direita"])
+       .range(["#e2030a", "#0a6b00", "#0073e6"])'
+        )
+      )
+      
+      legenda_html <- htmltools::tags$div(
+        style = "font-family: sans-serif; padding: 10px;",
+        htmltools::tags$h4("Legenda:", 
+                           style = "font-family: Garamond; font-size: 18px"),
+        htmltools::tags$ul(
+          #style = "list-style: none; padding-left: 0;",
+          style = "font-family: Garamond; font-size: 14px; list-style: none; padding-left: 0;",
+          htmltools::tags$li(htmltools::tags$span(style="color: #e2030a;", "■ "), "Esquerda"),
+          htmltools::tags$li(htmltools::tags$span(style="color: #0a6b00;", "■ "), "Centro"),
+          htmltools::tags$li(htmltools::tags$span(style="color: #0073e6;", "■ "), "Direita") ) )
+      
+      # Título superior
+      titulo_html <- tags$h2(
+        "Migração Ideológica de Deputados Reeleitos (1998–2022)",
+        style = "font-family: Garamond; text-align: center;"
+      )
+      
+      # Layout em flex: título acima, sankey + legenda lado a lado
+      grafico_completo <- browsable(
+        tags$div(
+          titulo_html,
+          tags$div(
+            style = "display: flex; align-items: flex-start; gap: 30px;",
+            sankey, legenda_html
+          )
+        )
+      )
+      
+      return(grafico_completo)
+    }
+    
+    gerar_sankey_ideologia_plotly <- function(df) {
+      
+      # Criar pares ideológicos consecutivos por deputado
+      df_pairs <- df |>
+        group_by(Nome_Deputado) |>
+        mutate(origem = lag(Ideologia),
+               destino = Ideologia,
+               ano_origem = lag(Ano_Eleição),
+               ano_destino = Ano_Eleição) |>
+        filter(!is.na(origem), ano_destino - ano_origem == 4) |>
+        ungroup() |>
+        mutate(source = paste0(origem, " em ", ano_origem),
+               target = paste0(destino, " em ", ano_destino)) |>
+        count(source, target, name = "value")
+      
+      # Criar lista de nós únicos
+      nodes <- data.frame(name = unique(c(df_pairs$source, df_pairs$target)))
+      
+      # Extrair ideologia e ano para ordenação
+      nodes$ideologia <- gsub(" em .*", "", nodes$name)
+      nodes$ano <- as.numeric(gsub(".* em ", "", nodes$name))
+      
+      # Definir posição X baseada no ano (0 a 1) - aproximando mais
+      anos_unicos <- sort(unique(nodes$ano))
+      nodes$x <- 0.1 + (match(nodes$ano, anos_unicos) - 1) * 0.8 / (length(anos_unicos) - 1) * 0.5
+      
+      # Definir posição Y baseada na ideologia dentro de cada ano
+      nodes <- nodes |>
+        group_by(ano) |>
+        mutate(y = case_when(
+          ideologia == "Esquerda" ~ 0.8,
+          ideologia == "Centro"   ~ 0.5,
+          ideologia == "Direita"  ~ 0.2,
+          TRUE ~ 0.5
+        )) |>
+        ungroup() |>
+        arrange(ano, factor(ideologia, levels = c("Esquerda", "Centro", "Direita")))
+      
+      # Definir cores
+      cores_ideologia <- c(
+        "Esquerda" = "#e2030a",
+        "Centro"   = "#0a6b00", 
+        "Direita"  = "#0073e6"
+      )
+      
+      nodes$color <- cores_ideologia[nodes$ideologia]
+      
+      # Mapear índices
+      df_pairs$source_id <- match(df_pairs$source, nodes$name) - 1
+      df_pairs$target_id <- match(df_pairs$target, nodes$name) - 1
+      
+      # Colorir conexões baseado na origem
+      df_pairs$link_color <- paste0(substr(nodes$color[df_pairs$source_id + 1], 1, 7), "80")
+      
+      # Criar sankey com plotly
+      fig <- plot_ly(
+        type = "sankey",
+        orientation = "h",
+        node = list(
+          label = rep("", nrow(nodes)),  # sem labels nos nós
+          color = nodes$color,
+          x = nodes$x,
+          y = nodes$y,
+          pad = 5,
+          thickness = 40,   # nós mais grossos
+          line = list(color = "black", width = 0.5)
+        ),
+        link = list(
+          source = df_pairs$source_id,
+          target = df_pairs$target_id,
+          value = df_pairs$value,
+          color = df_pairs$link_color
+        )
+      )
+      
+      # Layout com legenda customizada
+      fig <- fig |>
+        layout(
+          title = "Migração Por Espectro Ideológico (1998–2022)",
+          font = list(family = "Garamond", size = 25),
+          margin = list(l = 50, r = 150, t = 80, b = 50),
+          annotations = list(
+            # Título da legenda
+            list(x = 1.05, y = 0.95, text = "<b>Legenda:</b>", 
+                 showarrow = FALSE, xref = "paper", yref = "paper",
+                 font = list(family = "Garamond", size = 25)),
+            
+            # Itens da legenda
+            list(x = 1.05, y = 0.85, text = "■ Esquerda", 
+                 showarrow = FALSE, xref = "paper", yref = "paper",
+                 font = list(family = "Garamond", size = 18, color = "#e2030a")),
+            
+            list(x = 1.05, y = 0.78, text = "■ Centro", 
+                 showarrow = FALSE, xref = "paper", yref = "paper",
+                 font = list(family = "Garamond", size = 18, color = "#0a6b00")),
+            
+            list(x = 1.05, y = 0.71, text = "■ Direita", 
+                 showarrow = FALSE, xref = "paper", yref = "paper",
+                 font = list(family = "Garamond", size = 18, color = "#0073e6"))
+          )
+        )
+      
+      return(fig)
+    }
