@@ -1,3 +1,6 @@
+library(tidyverse)
+library(plotly)     # Para os sankey plots
+
 # Função para Sankey de Tamanho com Plotly - Versão Melhorada
     gerar_sankey_tamanho_plotly <- function(df) {
       
